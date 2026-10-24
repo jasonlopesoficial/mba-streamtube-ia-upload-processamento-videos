@@ -7,26 +7,26 @@ C4Container
     Container_Boundary(c1, "StreamTube") {
         Container(frontend, "Frontend", "Next.js", "Platform interface")
         Container(api, "API", "Nest.js", "Business rules and authentication")
-        Container(worker, "Video Worker", "FFmpeg", "Processes videos in background")
+        Container(worker, "Video Worker", "Nest.js + FFmpeg", "Extracts metadata and thumbnails in background")
         ContainerDb(db, "Database", "PostgreSQL", "Users, channels, videos, comments, likes")
-        ContainerDb(storage, "Object Storage", "S3 or MinIO", "Video files and thumbnails")
-        ContainerQueue(queue, "Message Queue", "TBD", "Enqueues video processing jobs")
+        ContainerDb(storage, "Object Storage", "MinIO (S3 API)", "Video files and thumbnails")
+        ContainerQueue(queue, "Message Queue", "BullMQ on Redis", "Enqueues video processing jobs")
     }
 
     System_Ext(email, "Email Service", "Account confirmation and password recovery")
 
     Rel(anonUser, frontend, "Uses", "HTTPS")
     Rel(authUser, frontend, "Uses", "HTTPS")
-    Rel(frontend, api, "Calls", "REST")
-    Rel(frontend, storage, "Streams", "HTTPS")
+    Rel(frontend, api, "Calls, streams", "REST + Range")
+    Rel(frontend, storage, "Uploads parts", "Presigned URLs")
 
     Rel(api, db, "Reads/Writes")
-    Rel(api, storage, "Uploads")
+    Rel(api, storage, "Multipart + ranged reads")
     Rel(api, queue, "Publishes job")
     Rel(api, email, "Sends email", "SMTP")
 
     Rel(queue, worker, "Delivers job")
-    Rel(worker, storage, "Reads/Saves")
+    Rel(worker, storage, "Reads (HTTP range) / Saves thumbnail")
     Rel(worker, db, "Updates")
 
     UpdateElementStyle(anonUser, $bgColor="#37474F", $fontColor="#ECEFF1", $borderColor="#78909C")

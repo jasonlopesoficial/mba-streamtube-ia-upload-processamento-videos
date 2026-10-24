@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
-**Status:** in_progress
-**SIs:** 14/15 completed
+**Status:** completed
+**SIs:** 15/15 completed
 
 ### SI-03.1 — Infra: dependências, namespaces de configuração e serviços MinIO/Redis no Compose
 - **Status:** completed
@@ -103,6 +103,9 @@
   - WorkerModule runs in-process next to the HTTP app with an isolated QUEUE_PREFIX, so the Compose video-worker (default prefix) never competes for test jobs.
 
 ### SI-03.15 — Documentação: CLAUDE.md, arquitetura e contrato OpenAPI
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** no tests (documentation) — openapi.json regenerated: 8 /videos operations on 7 paths with their response codes
+- **Observations:**
+  - Readiness commands documented in nestjs-project/CLAUDE.md were executed and their real output copied (mc ready local, redis-cli ping, worker log line).
+  - Root CLAUDE.md line about next-frontend ('not yet initialized') was stale — corrected to reflect the existing Phase 02 frontend, since CLAUDE.md must match the repository.
+  - software-arch.mermaid relations updated to the decided flows: client uploads parts to storage via presigned URLs; streaming goes through the API (Range).
