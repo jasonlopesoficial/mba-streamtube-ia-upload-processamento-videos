@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 2/15 completed
+**SIs:** 3/15 completed
 
 ### SI-03.1 — Infra: dependências, namespaces de configuração e serviços MinIO/Redis no Compose
 - **Status:** completed
@@ -18,9 +18,12 @@
   - Added src/storage/storage.types.ts for the service's return shapes (CompletedPart, StoredPart, ObjectHead, ObjectStream).
 
 ### SI-03.3 — Entidade Video, migration CreateVideos e VideosModule
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 10/10 passing (video.entity.integration-spec.ts: 6, migrations.integration-spec.ts: 3, videos.module.spec.ts: 1); full unit+integration suite 164/164
+- **Observations:**
+  - Channel now has @OneToMany videos, so every test DataSource that loads Channel must also register Video; added Video to the ALL_ENTITIES arrays of the 10 existing auth/users/channels specs.
+  - videos.module.spec.ts overrides the Video repository instead of opening a DB connection, keeping the *.spec.ts suffix honest (CLAUDE.md test-type rule).
+  - Migration spec now also asserts the CreateVideos revert step before the auth-tokens revert.
 
 ### SI-03.4 — VideosRepository e geração de slug único
 - **Status:** pending
