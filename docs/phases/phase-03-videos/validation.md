@@ -4,7 +4,7 @@ name: phase-03-videos
 status: clean
 issue_count: 0
 sources_mtime:
-  docs/phases/phase-03-videos/context.md: "2026-10-24T08:02:33-03:00"
+  docs/phases/phase-03-videos/context.md: "2026-10-24T08:02:54-03:00"
   docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-24T07:32:07-03:00"
 issues:
   - id: AMB-1

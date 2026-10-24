@@ -50,7 +50,8 @@ sources_mtime:
 
 | Ref | Source | Scope | Topic | Status | Decision | Libraries |
 |-----|--------|-------|-------|--------|----------|-----------|
-| phase-03-videos/TD-01 | phase | Backend | Message Queue Technology | decided | A (BullMQ on Redis) | @nestjs/bullmq@^12.0.0, bullmq@^6.4.0 |
+| phase-03-videos/TD-01 | phase | Backend | Message Queue Technology | decided | A (BullMQ on Redis) | @nestjs/bullmq@^11.0.5, bullmq@^6.4.0, ioredis@^5 |
+|  └─ Last revision: 2026-10-24 — `@nestjs/bullmq` pinned to `^11.0.5` (12.x is ESM-only) and `ioredis@^5` added |  |  |  |  |  |  |
 | phase-03-videos/TD-02 | phase | Cross-layer | Upload Protocol for Files up to 10GB | decided | C (Presigned S3 multipart upload) | @aws-sdk/client-s3@^3.x, @aws-sdk/s3-request-presigner@^3.x |
 | phase-03-videos/TD-03 | phase | Backend | S3 Client Library | decided | A (AWS SDK v3) | @aws-sdk/client-s3@^3.x, @aws-sdk/s3-request-presigner@^3.x |
 | phase-03-videos/TD-04 | phase | Backend | Bucket and Object Key Organization | decided | A (One private bucket, UUID-derived prefixes) | — |
@@ -86,7 +87,10 @@ _Source files:_
 
 **Recommendation:** BullMQ on Redis — it is the queue documented by NestJS itself, giving retries/backoff/deduplication as job options and a `WorkerHost` consumer that runs in a separate process with the same `ConfigModule`/`TypeOrmModule` wiring the project already uses; the cost is one Redis container, acceptable for a video platform whose processing is the heaviest workload. pg-boss would avoid Redis but loads the primary DB and has no Nest integration.
 
-**Libraries:** `@nestjs/bullmq@^12.0.0`, `bullmq@^6.4.0`
+**Libraries:** `@nestjs/bullmq@^11.0.5`, `bullmq@^6.4.0`, `ioredis@^5`
+
+**Revisions:**
+- 2026-10-24 — `@nestjs/bullmq` pinned to `^11.0.5` (instead of `^12.0.0`) and `ioredis@^5` added. Rationale: `@nestjs/bullmq@12` is ESM-only and cannot be loaded by the CommonJS Jest runtime on NestJS 11; `bullmq@6` made `ioredis` an optional peer.
 
 ### phase-03-videos/TD-02
 
@@ -105,6 +109,9 @@ _Source files:_
 **Recommendation:** One private bucket with UUID-derived prefixes — the phase has no requirement for different access policies, and keys based on `videoId` keep storage independent from the public slug (TD-07) and from the original filename.
 
 **Libraries:** —
+
+**Revisions:**
+- 2026-10-24 — Local MinIO image is `cgr.dev/chainguard/minio:latest` (free `minio/minio` images are no longer published). Bucket/key layout unchanged.
 
 ### phase-03-videos/TD-05
 
