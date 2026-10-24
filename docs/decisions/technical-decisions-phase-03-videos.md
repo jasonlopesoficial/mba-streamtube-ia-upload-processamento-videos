@@ -142,6 +142,9 @@ _Subprojects in scope:_
 **Decision:** A (One private bucket, UUID-derived prefixes)
 **Libraries:** —
 
+**Revisions:**
+- 2026-10-24 — Local MinIO container image is `cgr.dev/chainguard/minio:latest` instead of `minio/minio`. Rationale: MinIO stopped publishing free images (`minio/minio` on Docker Hub returns "repository does not exist"; `quay.io/minio/minio` requires authentication); the Chainguard image is MinIO built from source, free to pull, and ships `mc` for the Compose healthcheck. Bucket/key layout unchanged.
+
 ---
 
 ## TD-05: Video Worker Runtime

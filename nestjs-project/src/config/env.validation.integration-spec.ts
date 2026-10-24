@@ -6,6 +6,8 @@ const requiredEnv = {
   DB_NAME: 'db',
   JWT_SECRET: 'secret',
   JWT_REFRESH_SECRET: 'refresh-secret',
+  S3_ACCESS_KEY: 'access',
+  S3_SECRET_KEY: 'secret',
 };
 
 const validate = (env: Record<string, string>) =>
@@ -35,5 +37,51 @@ describe('envValidationSchema — SWAGGER_ENABLED', () => {
     const { value, error } = validate({});
     expect(error).toBeUndefined();
     expect(value.SWAGGER_ENABLED).toBe('false');
+  });
+});
+
+describe('envValidationSchema — storage, queue and videos', () => {
+  it('should reject a missing S3_ACCESS_KEY', () => {
+    const { error } = envValidationSchema.validate(
+      { ...requiredEnv, S3_ACCESS_KEY: undefined },
+      { allowUnknown: true, abortEarly: false },
+    );
+    expect(error).toBeDefined();
+    expect(error!.message).toContain('S3_ACCESS_KEY');
+  });
+
+  it('should reject a missing S3_SECRET_KEY', () => {
+    const { error } = envValidationSchema.validate(
+      { ...requiredEnv, S3_SECRET_KEY: undefined },
+      { allowUnknown: true, abortEarly: false },
+    );
+    expect(error).toBeDefined();
+    expect(error!.message).toContain('S3_SECRET_KEY');
+  });
+
+  it('should apply Compose-friendly defaults', () => {
+    const { value, error } = validate({});
+    expect(error).toBeUndefined();
+    expect(value).toMatchObject({
+      S3_ENDPOINT: 'http://minio:9000',
+      S3_BUCKET: 'streamtube',
+      REDIS_HOST: 'redis',
+      REDIS_PORT: 6379,
+      QUEUE_PREFIX: 'streamtube',
+      VIDEO_MAX_SIZE_BYTES: 10737418240,
+      VIDEO_UPLOAD_PART_SIZE_BYTES: 67108864,
+      VIDEO_PROCESSING_ATTEMPTS: 3,
+    });
+  });
+
+  it('should reject an upload part size below the S3 minimum of 5 MiB', () => {
+    const { error } = validate({ VIDEO_UPLOAD_PART_SIZE_BYTES: '5242879' });
+    expect(error).toBeDefined();
+    expect(error!.message).toContain('VIDEO_UPLOAD_PART_SIZE_BYTES');
+  });
+
+  it('should accept an upload part size of exactly 5 MiB', () => {
+    const { error } = validate({ VIDEO_UPLOAD_PART_SIZE_BYTES: '5242880' });
+    expect(error).toBeUndefined();
   });
 });
