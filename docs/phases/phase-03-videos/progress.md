@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 13/15 completed
+**SIs:** 14/15 completed
 
 ### SI-03.1 — Infra: dependências, namespaces de configuração e serviços MinIO/Redis no Compose
 - **Status:** completed
@@ -96,9 +96,11 @@
   - openThumbnail also answers VIDEO_NOT_FOUND when a ready video has no thumbnail_key (defensive; the worker always sets it when reaching ready).
 
 ### SI-03.14 — Pipeline completo em E2E: upload direto → fila → worker → streaming e download
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 3/3 passing (test/video-pipeline.e2e-spec.ts)
+- **Observations:**
+  - test/helpers/video-upload.ts was already created in SI-03.8 and reused here.
+  - WorkerModule runs in-process next to the HTTP app with an isolated QUEUE_PREFIX, so the Compose video-worker (default prefix) never competes for test jobs.
 
 ### SI-03.15 — Documentação: CLAUDE.md, arquitetura e contrato OpenAPI
 - **Status:** pending
