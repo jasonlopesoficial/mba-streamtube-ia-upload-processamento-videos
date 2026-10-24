@@ -3,6 +3,8 @@ export abstract class DomainException extends Error {
     public readonly errorCode: string,
     public readonly httpStatus: number,
     message: string,
+    /** Extra HTTP response headers the filter must send (e.g. Content-Range). */
+    public readonly headers?: Record<string, string>,
   ) {
     super(message);
     this.name = this.constructor.name;
@@ -45,6 +47,75 @@ export class TokenReuseDetectedException extends DomainException {
       'TOKEN_REUSE_DETECTED',
       401,
       'Token reuse detected — all sessions revoked',
+    );
+  }
+}
+
+export class ChannelNotFoundException extends DomainException {
+  constructor() {
+    super('CHANNEL_NOT_FOUND', 404, 'Channel not found for the current user');
+  }
+}
+
+export class VideoTooLargeException extends DomainException {
+  constructor(maxSizeBytes: number) {
+    super(
+      'VIDEO_TOO_LARGE',
+      400,
+      `Video size exceeds the maximum of ${maxSizeBytes} bytes`,
+    );
+  }
+}
+
+export class VideoNotFoundException extends DomainException {
+  constructor() {
+    super('VIDEO_NOT_FOUND', 404, 'Video not found');
+  }
+}
+
+export class InvalidVideoStateException extends DomainException {
+  constructor(status: string) {
+    super(
+      'INVALID_VIDEO_STATE',
+      409,
+      `Operation not allowed while the video is ${status}`,
+    );
+  }
+}
+
+export class InvalidPartNumberException extends DomainException {
+  constructor(partCount: number) {
+    super(
+      'INVALID_PART_NUMBER',
+      400,
+      `Part numbers must be between 1 and ${partCount}`,
+    );
+  }
+}
+
+export class UploadIncompleteException extends DomainException {
+  constructor(reason: string) {
+    super('UPLOAD_INCOMPLETE', 400, `Upload could not be completed: ${reason}`);
+  }
+}
+
+export class UploadSizeMismatchException extends DomainException {
+  constructor(expected: number, actual: number) {
+    super(
+      'UPLOAD_SIZE_MISMATCH',
+      422,
+      `Uploaded size ${actual} does not match the declared size ${expected}`,
+    );
+  }
+}
+
+export class RangeNotSatisfiableException extends DomainException {
+  constructor(sizeBytes: number) {
+    super(
+      'RANGE_NOT_SATISFIABLE',
+      416,
+      'Requested range is beyond the end of the video',
+      { 'Content-Range': `bytes */${sizeBytes}` },
     );
   }
 }

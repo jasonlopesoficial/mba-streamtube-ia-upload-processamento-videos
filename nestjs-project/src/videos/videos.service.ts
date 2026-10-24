@@ -1,0 +1,321 @@
+import { randomUUID } from 'node:crypto';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
+import type { ConfigType } from '@nestjs/config';
+import { ChannelsService } from '../channels/channels.service';
+import {
+  ChannelNotFoundException,
+  InvalidPartNumberException,
+  InvalidVideoStateException,
+  RangeNotSatisfiableException,
+  UploadIncompleteException,
+  UploadSizeMismatchException,
+  VideoNotFoundException,
+  VideoTooLargeException,
+} from '../common/exceptions/domain.exception';
+import storageConfig from '../config/storage.config';
+import videosConfig from '../config/videos.config';
+import { videoSourceKey } from '../storage/storage.constants';
+import { StorageUploadRejectedError } from '../storage/storage.errors';
+import { StorageService } from '../storage/storage.service';
+import { CompletedPartDto } from './dto/complete-upload.dto';
+import { CreateVideoDto } from './dto/create-video.dto';
+import { CreateVideoResponseDto } from './dto/create-video-response.dto';
+import { VideoResponseDto } from './dto/video-response.dto';
+import {
+  SignedUploadPartsResponseDto,
+  UploadedPartsResponseDto,
+} from './dto/upload-parts-response.dto';
+import { buildAttachmentDisposition } from './content-disposition.util';
+import { Video } from './entities/video.entity';
+import { parseRangeHeader, UNSATISFIABLE } from './range.util';
+import type { VideoDelivery } from './video-delivery.types';
+import { VideoProcessingProducer } from './video-processing.producer';
+import { VideoStatus } from './videos.constants';
+import { VideosRepository } from './videos.repository';
+
+@Injectable()
+export class VideosService {
+  constructor(
+    private readonly videosRepository: VideosRepository,
+    private readonly storageService: StorageService,
+    private readonly channelsService: ChannelsService,
+    private readonly producer: VideoProcessingProducer,
+    @Inject(videosConfig.KEY)
+    private readonly config: ConfigType<typeof videosConfig>,
+    @Inject(storageConfig.KEY)
+    private readonly storage: ConfigType<typeof storageConfig>,
+  ) {}
+
+  /** Pre-registers a draft video and opens its multipart upload in storage. */
+  async initiateUpload(
+    userId: string,
+    dto: CreateVideoDto,
+  ): Promise<CreateVideoResponseDto> {
+    if (dto.size_bytes > this.config.maxSizeBytes) {
+      throw new VideoTooLargeException(this.config.maxSizeBytes);
+    }
+
+    const channel = await this.channelsService.findByUserId(userId);
+    if (!channel) {
+      throw new ChannelNotFoundException();
+    }
+
+    const id = randomUUID();
+    const storageKey = videoSourceKey(id);
+    const uploadId = await this.storageService.createMultipartUpload(
+      storageKey,
+      dto.content_type,
+    );
+
+    let video: Video;
+    try {
+      video = await this.videosRepository.createDraft({
+        id,
+        channel_id: channel.id,
+        title: dto.title,
+        original_filename: dto.file_name,
+        content_type: dto.content_type,
+        size_bytes: dto.size_bytes,
+        storage_key: storageKey,
+        upload_id: uploadId,
+      });
+    } catch (err) {
+      // Do not leave an orphan multipart upload behind.
+      await this.storageService.abortMultipartUpload(storageKey, uploadId);
+      throw err;
+    }
+
+    const partSize = this.config.uploadPartSizeBytes;
+    return {
+      video: VideoResponseDto.fromEntity(video),
+      upload: {
+        part_size: partSize,
+        part_count: this.partCount(dto.size_bytes),
+      },
+    };
+  }
+
+  /** Owner view of a video in any status. */
+  async getOwnedVideo(slug: string, userId: string): Promise<VideoResponseDto> {
+    return VideoResponseDto.fromEntity(await this.findOwnedVideo(slug, userId));
+  }
+
+  /** Presigned part URLs for the owner's draft (also used to resume uploads). */
+  async signUploadParts(
+    slug: string,
+    userId: string,
+    partNumbers: number[],
+  ): Promise<SignedUploadPartsResponseDto> {
+    const video = await this.findOwnedDraft(slug, userId);
+    const partCount = this.partCount(video.size_bytes);
+    if (partNumbers.some((n) => n > partCount)) {
+      throw new InvalidPartNumberException(partCount);
+    }
+
+    const parts = await Promise.all(
+      [...partNumbers]
+        .sort((a, b) => a - b)
+        .map(async (partNumber) => ({
+          part_number: partNumber,
+          url: await this.storageService.presignUploadPart(
+            video.storage_key,
+            video.upload_id!,
+            partNumber,
+          ),
+        })),
+    );
+    return { parts, expires_in_seconds: this.storage.presignExpirationSeconds };
+  }
+
+  /** Parts already stored for the owner's draft, so a client can resume. */
+  async listUploadedParts(
+    slug: string,
+    userId: string,
+  ): Promise<UploadedPartsResponseDto> {
+    const video = await this.findOwnedDraft(slug, userId);
+    const parts = await this.storageService.listParts(
+      video.storage_key,
+      video.upload_id!,
+    );
+    return {
+      parts: parts.map((p) => ({
+        part_number: p.partNumber,
+        etag: p.etag,
+        size_bytes: p.sizeBytes,
+      })),
+    };
+  }
+
+  /**
+   * Completes the multipart upload, verifies the stored size, moves the video
+   * to `processing` and enqueues the `process-video` job.
+   */
+  async completeUpload(
+    slug: string,
+    userId: string,
+    parts: CompletedPartDto[],
+  ): Promise<VideoResponseDto> {
+    const video = await this.findOwnedDraft(slug, userId);
+
+    try {
+      await this.storageService.completeMultipartUpload(
+        video.storage_key,
+        video.upload_id!,
+        parts.map((p) => ({ partNumber: p.part_number, etag: p.etag })),
+      );
+    } catch (err) {
+      if (err instanceof StorageUploadRejectedError) {
+        throw new UploadIncompleteException(err.code);
+      }
+      throw err;
+    }
+
+    const { sizeBytes } = await this.storageService.headObject(
+      video.storage_key,
+    );
+    if (sizeBytes !== video.size_bytes) {
+      await this.storageService.deleteObject(video.storage_key);
+      await this.videosRepository.transitionStatus(
+        video.id,
+        VideoStatus.DRAFT,
+        VideoStatus.FAILED,
+        {
+          upload_id: null,
+          processing_error: `Uploaded size ${sizeBytes} does not match declared size ${video.size_bytes}`,
+          processed_at: new Date(),
+        },
+      );
+      throw new UploadSizeMismatchException(video.size_bytes, sizeBytes);
+    }
+
+    const moved = await this.videosRepository.transitionStatus(
+      video.id,
+      VideoStatus.DRAFT,
+      VideoStatus.PROCESSING,
+      { upload_id: null },
+    );
+    if (!moved) {
+      throw new InvalidVideoStateException(VideoStatus.PROCESSING);
+    }
+
+    try {
+      await this.producer.enqueue(video.id);
+    } catch (err) {
+      await this.videosRepository.transitionStatus(
+        video.id,
+        VideoStatus.PROCESSING,
+        VideoStatus.FAILED,
+        {
+          processing_error: 'Could not enqueue video processing',
+          processed_at: new Date(),
+        },
+      );
+      throw err;
+    }
+
+    const updated = await this.videosRepository.findById(video.id);
+    return VideoResponseDto.fromEntity(updated!);
+  }
+
+  /** Streams a ready video, honouring a single `Range` request (206). */
+  async openStream(
+    slug: string,
+    rangeHeader: string | undefined,
+  ): Promise<VideoDelivery> {
+    const video = await this.findReadyVideo(slug);
+    const range = parseRangeHeader(rangeHeader, video.size_bytes);
+    if (range === UNSATISFIABLE) {
+      throw new RangeNotSatisfiableException(video.size_bytes);
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': video.content_type,
+      'Accept-Ranges': 'bytes',
+    };
+    if (!range) {
+      const object = await this.storageService.getObjectStream(
+        video.storage_key,
+      );
+      headers['Content-Length'] = String(object.contentLength);
+      return { statusCode: HttpStatus.OK, headers, body: object.body };
+    }
+
+    const object = await this.storageService.getObjectStream(
+      video.storage_key,
+      `bytes=${range.start}-${range.end}`,
+    );
+    headers['Content-Length'] = String(object.contentLength);
+    headers['Content-Range'] =
+      object.contentRange ??
+      `bytes ${range.start}-${range.end}/${video.size_bytes}`;
+    return {
+      statusCode: HttpStatus.PARTIAL_CONTENT,
+      headers,
+      body: object.body,
+    };
+  }
+
+  /** Full ready video as an attachment named after the original file. */
+  async openDownload(slug: string): Promise<VideoDelivery> {
+    const video = await this.findReadyVideo(slug);
+    const object = await this.storageService.getObjectStream(video.storage_key);
+    return {
+      statusCode: HttpStatus.OK,
+      headers: {
+        'Content-Type': video.content_type,
+        'Content-Length': String(object.contentLength),
+        'Content-Disposition': buildAttachmentDisposition(
+          video.original_filename,
+        ),
+      },
+      body: object.body,
+    };
+  }
+
+  /** JPEG thumbnail generated by the worker. */
+  async openThumbnail(slug: string): Promise<VideoDelivery> {
+    const video = await this.findReadyVideo(slug);
+    if (!video.thumbnail_key) {
+      throw new VideoNotFoundException();
+    }
+    const object = await this.storageService.getObjectStream(
+      video.thumbnail_key,
+    );
+    return {
+      statusCode: HttpStatus.OK,
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'Content-Length': String(object.contentLength),
+      },
+      body: object.body,
+    };
+  }
+
+  private async findReadyVideo(slug: string): Promise<Video> {
+    const video = await this.videosRepository.findBySlugWithChannel(slug);
+    if (!video || video.status !== VideoStatus.READY) {
+      throw new VideoNotFoundException();
+    }
+    return video;
+  }
+
+  private partCount(sizeBytes: number): number {
+    return Math.ceil(sizeBytes / this.config.uploadPartSizeBytes);
+  }
+
+  private async findOwnedVideo(slug: string, userId: string): Promise<Video> {
+    const video = await this.videosRepository.findBySlugWithChannel(slug);
+    if (!video || video.channel.user_id !== userId) {
+      throw new VideoNotFoundException();
+    }
+    return video;
+  }
+
+  private async findOwnedDraft(slug: string, userId: string): Promise<Video> {
+    const video = await this.findOwnedVideo(slug, userId);
+    if (video.status !== VideoStatus.DRAFT || !video.upload_id) {
+      throw new InvalidVideoStateException(video.status);
+    }
+    return video;
+  }
+}
