@@ -177,7 +177,7 @@ Entregar upload de vídeos de até 10GB direto ao object storage (MinIO/S3) sem 
 ### SI-03.6 — Endpoint POST /videos: pré-cadastro como rascunho e abertura do multipart
 
 **Route:** POST /videos
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-create.plan.md`
 **Authorization:** Authenticated (per `### Authorization Matrix`)
 
 **Description:** Inicia o upload: cria o vídeo `draft` no canal do usuário e abre o multipart no MinIO, devolvendo o plano de partes — nenhum byte do arquivo passa pela API.
@@ -213,7 +213,7 @@ Entregar upload de vídeos de até 10GB direto ao object storage (MinIO/S3) sem 
 ### SI-03.7 — Endpoints de partes do upload: assinatura de URLs e listagem para retomada
 
 **Route:** POST /videos/{slug}/upload/parts · GET /videos/{slug}/upload/parts
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-upload-parts.plan.md`
 **Authorization:** Owner (per `### Authorization Matrix`)
 
 **Description:** Entrega ao dono do vídeo URLs pré-assinadas por parte e a lista de partes já enviadas, permitindo upload direto ao MinIO e retomada após falha de conexão.
@@ -248,7 +248,7 @@ Entregar upload de vídeos de até 10GB direto ao object storage (MinIO/S3) sem 
 ### SI-03.8 — Endpoint POST /videos/{slug}/upload/complete: conclusão do upload e enfileiramento
 
 **Route:** POST /videos/{slug}/upload/complete
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-upload-complete.plan.md`
 **Authorization:** Owner (per `### Authorization Matrix`)
 
 **Description:** Fecha o multipart, confere o tamanho armazenado, move o vídeo para `processing` e dispara o processamento automático na fila.
@@ -344,7 +344,7 @@ Entregar upload de vídeos de até 10GB direto ao object storage (MinIO/S3) sem 
 ### SI-03.11 — Endpoint GET /videos/{slug}: consulta do vídeo e do status pelo dono
 
 **Route:** GET /videos/{slug}
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-get.plan.md`
 **Authorization:** Owner (per `### Authorization Matrix`)
 
 **Description:** Expõe ao dono o estado do vídeo (rascunho, processando, pronto ou erro) com metadados e links de entrega, refletindo o ciclo de status gravado no banco.
@@ -374,7 +374,7 @@ Entregar upload de vídeos de até 10GB direto ao object storage (MinIO/S3) sem 
 ### SI-03.12 — Endpoint GET /videos/{slug}/stream: streaming com Range e 206 Partial Content
 
 **Route:** GET /videos/{slug}/stream
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-stream.plan.md`
 **Authorization:** Anonymous (`ready` only) (per `### Authorization Matrix`)
 
 **Description:** Permite reproduzir o vídeo sem baixá-lo inteiro, atendendo requisições `Range` com leitura parcial do MinIO repassada em stream.
@@ -408,7 +408,7 @@ Entregar upload de vídeos de até 10GB direto ao object storage (MinIO/S3) sem 
 ### SI-03.13 — Endpoints GET /videos/{slug}/download e /thumbnail
 
 **Route:** GET /videos/{slug}/download · GET /videos/{slug}/thumbnail
-**Test Specs:** _pending /plan-test-specs_
+**Test Specs:** see `nestjs-project/specs/videos-download.plan.md`
 **Authorization:** Anonymous (`ready` only) (per `### Authorization Matrix`)
 
 **Description:** Entrega o arquivo completo como download (com o nome original) e a thumbnail gerada pelo worker.
