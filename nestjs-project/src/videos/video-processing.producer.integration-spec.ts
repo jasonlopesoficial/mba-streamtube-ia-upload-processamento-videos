@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { getQueueToken } from '@nestjs/bullmq';
+import { BullModule, getQueueToken } from '@nestjs/bullmq';
 import { ConfigModule } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { Queue } from 'bullmq';
 import queueConfig from '../config/queue.config';
 import videosConfig from '../config/videos.config';
@@ -12,9 +11,7 @@ import {
   PROCESS_VIDEO_JOB,
   VIDEO_PROCESSING_QUEUE,
 } from '../video-processing/video-processing.constants';
-import { Video } from './entities/video.entity';
 import { VideoProcessingProducer } from './video-processing.producer';
-import { VideosModule } from './videos.module';
 
 describe('VideoProcessingProducer (integration)', () => {
   let module: TestingModule;
@@ -31,12 +28,10 @@ describe('VideoProcessingProducer (integration)', () => {
           load: [queueConfig, videosConfig],
         }),
         QueueModule,
-        VideosModule,
+        BullModule.registerQueue({ name: VIDEO_PROCESSING_QUEUE }),
       ],
-    })
-      .overrideProvider(getRepositoryToken(Video))
-      .useValue({})
-      .compile();
+      providers: [VideoProcessingProducer],
+    }).compile();
     producer = module.get(VideoProcessingProducer);
     queue = module.get(getQueueToken(VIDEO_PROCESSING_QUEUE));
   });

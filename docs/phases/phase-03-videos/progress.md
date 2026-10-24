@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 5/15 completed
+**SIs:** 6/15 completed
 
 ### SI-03.1 — Infra: dependências, namespaces de configuração e serviços MinIO/Redis no Compose
 - **Status:** completed
@@ -39,9 +39,13 @@
   - VideosModule now registers the queue, so DB-focused specs that import it (videos.repository.integration-spec.ts) override the queue token.
 
 ### SI-03.6 — Endpoint POST /videos: pré-cadastro como rascunho e abertura do multipart
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 13 passing (videos.service.spec.ts: 5, videos.service.integration-spec.ts: 1, channels.service.integration-spec.ts: +2 findByUserId, videos.module.spec.ts: 1) + spec-derived E2E test/videos-create.e2e-spec.ts 4/4
+- **Observations:**
+  - VideosController carries @SkipThrottle() — the ThrottlerGuard is registered as a global APP_GUARD by AuthModule, and the inherited convention (phase-02-auth/TD-08, AppController) scopes rate limiting to auth routes; without it ranged stream requests would hit 429.
+  - autoLoadEntities only registers entities declared via forFeature: Channel relates to User, so contexts without AuthModule (integration specs, later the worker) must import UsersModule.
+  - Repository/producer integration specs now build minimal modules (forFeature + provider) instead of importing the growing VideosModule.
+  - Added test/helpers/app.ts (main.ts globals + register/confirm/login) shared by the phase's E2E suites.
 
 ### SI-03.7 — Endpoints de partes do upload: assinatura de URLs e listagem para retomada
 - **Status:** pending
