@@ -69,6 +69,31 @@ export class VideosController {
     return this.videosService.initiateUpload(user.sub, dto);
   }
 
+  @Get(':slug')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Get an owned video',
+    description:
+      'Returns a video of the caller channel in any status (draft, processing, ready, failed), with metadata and delivery links once ready.',
+  })
+  @ApiResponse({ status: 200, description: 'Video', type: VideoResponseDto })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid access token',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found or owned by another channel',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async findOne(
+    @CurrentUser() user: JwtPayload,
+    @Param('slug') slug: string,
+  ): Promise<VideoResponseDto> {
+    return this.videosService.getOwnedVideo(slug, user.sub);
+  }
+
   @Post(':slug/upload/parts')
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth('access-token')

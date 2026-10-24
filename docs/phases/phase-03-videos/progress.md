@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 10/15 completed
+**SIs:** 11/15 completed
 
 ### SI-03.1 — Infra: dependências, namespaces de configuração e serviços MinIO/Redis no Compose
 - **Status:** completed
@@ -78,8 +78,8 @@
   - Added src/test/video-fixtures.ts (channel owner + stored video row) shared by worker and delivery specs.
 
 ### SI-03.11 — Endpoint GET /videos/{slug}: consulta do vídeo e do status pelo dono
-- **Status:** pending
-- **Tests:** —
+- **Status:** completed
+- **Tests:** 5 passing in videos.service.spec.ts (+5: one per status + non-owner) + spec-derived E2E test/videos-get.e2e-spec.ts 4/4
 - **Observations:** none
 
 ### SI-03.12 — Endpoint GET /videos/{slug}/stream: streaming com Range e 206 Partial Content

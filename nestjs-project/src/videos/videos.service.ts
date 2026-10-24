@@ -91,6 +91,11 @@ export class VideosService {
     };
   }
 
+  /** Owner view of a video in any status. */
+  async getOwnedVideo(slug: string, userId: string): Promise<VideoResponseDto> {
+    return VideoResponseDto.fromEntity(await this.findOwnedVideo(slug, userId));
+  }
+
   /** Presigned part URLs for the owner's draft (also used to resume uploads). */
   async signUploadParts(
     slug: string,

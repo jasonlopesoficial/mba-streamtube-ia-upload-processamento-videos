@@ -328,4 +328,32 @@ describe('VideosService', () => {
       );
     });
   });
+
+  describe('getOwnedVideo', () => {
+    it.each([
+      VideoStatus.DRAFT,
+      VideoStatus.PROCESSING,
+      VideoStatus.READY,
+      VideoStatus.FAILED,
+    ])('returns the owner video in status %s', async (status) => {
+      repository.findBySlugWithChannel.mockResolvedValueOnce(
+        buildVideo({ status }),
+      );
+
+      const result = await service.getOwnedVideo('AAAAAAAAAAA', 'user-1');
+
+      expect(result.status).toBe(status);
+      expect(result.stream_url).toBe(
+        status === VideoStatus.READY ? '/videos/AAAAAAAAAAA/stream' : null,
+      );
+    });
+
+    it('hides videos of other channels', async () => {
+      repository.findBySlugWithChannel.mockResolvedValueOnce(buildVideo());
+
+      await expect(
+        service.getOwnedVideo('AAAAAAAAAAA', 'intruder'),
+      ).rejects.toBeInstanceOf(VideoNotFoundException);
+    });
+  });
 });
