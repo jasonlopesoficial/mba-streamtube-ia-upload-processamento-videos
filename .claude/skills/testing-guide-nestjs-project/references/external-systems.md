@@ -37,47 +37,30 @@ How each external system is handled in tests. These strategies were confirmed wi
 
 ---
 
-## Object Storage — Local Filesystem
+## Object Storage — MinIO (Real, Docker)
 
-**Strategy:** Local filesystem storage in development and tests. S3 in production.
+**Strategy:** Real S3-compatible storage via the Compose `minio` service, in development **and** tests (decision `phase-03-videos/TD-11`, which superseded the earlier local-filesystem adapter guidance). Amazon S3 is reached in production by changing env vars only. A filesystem adapter cannot reproduce presigned multipart uploads, `ListParts` or ranged `GetObject`, so it is not used.
 
 **Approach:**
-- The storage layer should use an abstraction (e.g., `StorageService` interface) that allows switching between local filesystem and S3
-- In tests, use the local filesystem adapter — no mocking needed
-- Use a temporary directory for test uploads: `os.tmpdir()` or a dedicated `test-uploads/` directory
-- Clean up test files in `afterAll`
 
-**Setup pattern:**
-```typescript
-// In test module setup
-{
-  provide: 'STORAGE_CONFIG',
-  useValue: {
-    driver: 'local',
-    basePath: path.join(os.tmpdir(), 'streamtube-test-uploads'),
-  },
-}
-```
+- `StorageService` (`src/storage/storage.service.ts`) wraps the AWS SDK v3 client pointed at `S3_ENDPOINT` (`http://minio:9000`).
+- Tests use the real service — no mocking of the S3 client.
+- Isolate data: either a dedicated bucket per spec (set `process.env.S3_BUCKET` before compiling the module; `StorageService.onModuleInit` creates it) or unique keys (`videos/{randomUUID()}/source`); remove what the spec created in `afterAll`.
+- Presigned URLs are signed for `S3_PUBLIC_ENDPOINT`; inside the container it defaults to `http://minio:9000`, so tests can `fetch(url, { method: 'PUT', body })` directly.
 
 **Integration test:**
+
 ```typescript
-import * as fs from 'fs';
-import * as path from 'path';
-import * as os from 'os';
-
 describe('StorageService (integration)', () => {
-  const testDir = path.join(os.tmpdir(), 'streamtube-test-uploads');
-
-  afterAll(() => {
-    fs.rmSync(testDir, { recursive: true, force: true });
-  });
-
-  it('should upload and retrieve a file', async () => {
-    const buffer = Buffer.from('test content');
-    const key = await storageService.upload(buffer, 'test.txt');
-
-    const retrieved = await storageService.get(key);
-    expect(retrieved.toString()).toBe('test content');
+  it('should complete a multipart upload sent through presigned URLs', async () => {
+    const key = `videos/${randomUUID()}/source`;
+    const uploadId = await storage.createMultipartUpload(key, 'video/mp4');
+    const url = await storage.presignUploadPart(key, uploadId, 1);
+    const res = await fetch(url, { method: 'PUT', body: randomBytes(1024) });
+    await storage.completeMultipartUpload(key, uploadId, [
+      { partNumber: 1, etag: res.headers.get('etag')! },
+    ]);
+    expect((await storage.headObject(key)).sizeBytes).toBe(1024);
   });
 });
 ```
