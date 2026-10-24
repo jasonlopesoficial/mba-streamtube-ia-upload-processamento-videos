@@ -251,6 +251,46 @@ export class VideosController {
     return this.send(res, await this.videosService.openStream(slug, range));
   }
 
+  @Public()
+  @Get(':slug/download')
+  @ApiOperation({
+    summary: 'Download a video',
+    description:
+      'Public download of a ready video as an attachment named after the original file.',
+  })
+  @ApiResponse({ status: 200, description: 'Video file (attachment)' })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found or not ready',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async download(
+    @Param('slug') slug: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return this.send(res, await this.videosService.openDownload(slug));
+  }
+
+  @Public()
+  @Get(':slug/thumbnail')
+  @ApiOperation({
+    summary: 'Get a video thumbnail',
+    description:
+      'Public JPEG thumbnail generated from a frame of a ready video.',
+  })
+  @ApiResponse({ status: 200, description: 'JPEG thumbnail' })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found or not ready',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async thumbnail(
+    @Param('slug') slug: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return this.send(res, await this.videosService.openThumbnail(slug));
+  }
+
   private send(res: Response, delivery: VideoDelivery): StreamableFile {
     res.status(delivery.statusCode).set(delivery.headers);
     return new StreamableFile(delivery.body);

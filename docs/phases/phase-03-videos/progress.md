@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 12/15 completed
+**SIs:** 13/15 completed
 
 ### SI-03.1 — Infra: dependências, namespaces de configuração e serviços MinIO/Redis no Compose
 - **Status:** completed
@@ -90,9 +90,10 @@
   - Body is piped from the S3 GetObject stream through StreamableFile; the API never buffers the video in memory.
 
 ### SI-03.13 — Endpoints GET /videos/{slug}/download e /thumbnail
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 6 passing (content-disposition.util.spec.ts: 4, videos.service.integration-spec.ts: +2) + spec-derived E2E test/videos-download.e2e-spec.ts 3/3
+- **Observations:**
+  - openThumbnail also answers VIDEO_NOT_FOUND when a ready video has no thumbnail_key (defensive; the worker always sets it when reaching ready).
 
 ### SI-03.14 — Pipeline completo em E2E: upload direto → fila → worker → streaming e download
 - **Status:** pending

@@ -208,4 +208,53 @@ describe('VideosService (integration)', () => {
       });
     });
   });
+
+  describe('openDownload / openThumbnail', () => {
+    it('delivers the whole file as an attachment and the JPEG thumbnail', async () => {
+      const bytes = randomBytes(2048);
+      const video = await createStoredVideo(
+        dataSource,
+        storage,
+        await ownerChannel(),
+        bytes,
+        VideoStatus.READY,
+      );
+      const thumb = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]);
+      await storage.putObject(
+        `thumbnails/${video.id}.jpg`,
+        thumb,
+        'image/jpeg',
+      );
+      await dataSource
+        .getRepository(Video)
+        .update(video.id, { thumbnail_key: `thumbnails/${video.id}.jpg` });
+
+      const download = await service.openDownload(video.slug);
+      expect(download.headers['Content-Disposition']).toContain(
+        'filename="sample.mp4"',
+      );
+      expect(await readAll(download.body)).toEqual(bytes);
+
+      const thumbnail = await service.openThumbnail(video.slug);
+      expect(thumbnail.headers['Content-Type']).toBe('image/jpeg');
+      expect(await readAll(thumbnail.body)).toEqual(thumb);
+    });
+
+    it('treats draft videos as not found', async () => {
+      const video = await createStoredVideo(
+        dataSource,
+        storage,
+        await ownerChannel(),
+        randomBytes(64),
+        VideoStatus.DRAFT,
+      );
+
+      await expect(service.openDownload(video.slug)).rejects.toMatchObject({
+        errorCode: 'VIDEO_NOT_FOUND',
+      });
+      await expect(service.openThumbnail(video.slug)).rejects.toMatchObject({
+        errorCode: 'VIDEO_NOT_FOUND',
+      });
+    });
+  });
 });
