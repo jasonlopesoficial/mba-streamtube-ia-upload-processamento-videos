@@ -3,14 +3,14 @@ kind: phase
 name: phase-03-videos
 sources_mtime:
   docs/project-plan.md: "2026-10-23T16:24:23-03:00"
-  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-23T17:59:32-03:00"
+  docs/decisions/technical-decisions-phase-03-videos.md: "2026-10-23T18:03:52-03:00"
   docs/decisions/technical-decisions-phase-02-auth.md: "2026-10-23T16:24:49-03:00"
   docs/decisions/technical-decisions-phase-01-configuracao-base.md: "2026-10-23T16:24:49-03:00"
   docs/decisions/technical-decisions-openapi-docs-nestjs.md: "2026-10-23T16:24:49-03:00"
   docs/phases/phase-02-auth/context.md: "2026-10-23T16:24:49-03:00"
   docs/phases/phase-01-configuracao-base/context.md: "2026-10-23T16:24:49-03:00"
   .claude/skills/testing-guide-nestjs-project/SKILL.md: "2026-10-23T16:24:23-03:00"
-  docs/phases/phase-03-videos/library-refs.md: "2026-10-23T18:00:54-03:00"
+  docs/phases/phase-03-videos/library-refs.md: "2026-10-23T18:05:47-03:00"
 ---
 
 # phase-03-videos — Context
