@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 3/15 completed
+**SIs:** 4/15 completed
 
 ### SI-03.1 — Infra: dependências, namespaces de configuração e serviços MinIO/Redis no Compose
 - **Status:** completed
@@ -26,9 +26,10 @@
   - Migration spec now also asserts the CreateVideos revert step before the auth-tokens revert.
 
 ### SI-03.4 — VideosRepository e geração de slug único
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 8/8 passing (slug.util.spec.ts: 2, videos.repository.integration-spec.ts: 6)
+- **Observations:**
+  - isUniqueViolationOn lives in src/common/database/pg-errors.ts; ChannelsService keeps its own private copy (Phase 02 code untouched) — consolidating it is a follow-up outside this phase's scope.
 
 ### SI-03.5 — Módulos de infraestrutura compartilhados e produtor da fila `video-processing`
 - **Status:** pending
