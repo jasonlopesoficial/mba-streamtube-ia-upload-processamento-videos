@@ -109,3 +109,21 @@
   - Readiness commands documented in nestjs-project/CLAUDE.md were executed and their real output copied (mc ready local, redis-cli ping, worker log line).
   - Root CLAUDE.md line about next-frontend ('not yet initialized') was stale — corrected to reflect the existing Phase 02 frontend, since CLAUDE.md must match the repository.
   - software-arch.mermaid relations updated to the decided flows: client uploads parts to storage via presigned URLs; streaming goes through the API (Range).
+
+## Final verification (2026-10-24)
+
+- **Unit + integration:** `docker compose exec nestjs-api npm test -- --runInBand` → 40 suites, 242/242 passing
+- **E2E:** `docker compose exec nestjs-api npm run test:e2e` → 10 suites, 80/80 passing
+- **Type-check:** `npx tsc --noEmit` → exit 0
+- **Lint:** `npm run lint` → exit 0 (0 errors, 44 warnings — warning-level rules per eslint.config.mjs)
+- **Build:** `npm run build` → `dist/main.js` and `dist/worker.js`
+- **Compose:** `db`, `mailpit`, `minio`, `redis` (healthy), `nestjs-api`, `video-worker` running
+- **Fixes found during final verification:**
+  - `migrations.integration-spec.ts` dropped tables with `Promise.all`; with the new `videos → channels` FK the concurrent `DROP ... CASCADE` deadlocked when a `synchronize` suite ran first. Drops are now sequential.
+  - `npm run test:e2e` lacked `--runInBand` although `nestjs-project/CLAUDE.md` documents it as "already configured"; with 10 suites sharing the DB they collided. Added the flag to the script.
+
+## Follow-ups (out of scope)
+
+- `ChannelsService` keeps a private unique-violation helper; it could reuse `src/common/database/pg-errors.ts`.
+- Orphan multipart uploads of abandoned drafts are not cleaned up (MinIO/S3 lifecycle rule or a scheduled abort job).
+- `next-frontend` OpenAPI types (`scripts/sync-openapi.sh`) were not regenerated — no video UI in this phase.
