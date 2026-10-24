@@ -2,11 +2,15 @@ import {
   Body,
   Controller,
   Get,
+  Headers,
   HttpCode,
   HttpStatus,
   Param,
   Post,
+  Res,
+  StreamableFile,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -17,6 +21,7 @@ import {
 import { SkipThrottle } from '@nestjs/throttler';
 import type { JwtPayload } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Public } from '../auth/decorators/public.decorator';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
 import { CompleteUploadDto } from './dto/complete-upload.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
@@ -27,6 +32,7 @@ import {
   UploadedPartsResponseDto,
 } from './dto/upload-parts-response.dto';
 import { VideoResponseDto } from './dto/video-response.dto';
+import type { VideoDelivery } from './video-delivery.types';
 import { VideosService } from './videos.service';
 
 @ApiTags('videos')
@@ -213,5 +219,40 @@ export class VideosController {
     @Body() dto: CompleteUploadDto,
   ): Promise<VideoResponseDto> {
     return this.videosService.completeUpload(slug, user.sub, dto.parts);
+  }
+
+  @Public()
+  @Get(':slug/stream')
+  @ApiOperation({
+    summary: 'Stream a video',
+    description:
+      'Public playback of a ready video. Honours a single `Range: bytes=` request with 206 Partial Content so playback starts without downloading the whole file.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Full video body (no Range header)',
+  })
+  @ApiResponse({ status: 206, description: 'Requested byte range' })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found or not ready',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 416,
+    description: 'Range starts beyond the end of the video',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async stream(
+    @Param('slug') slug: string,
+    @Headers('range') range: string | undefined,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<StreamableFile> {
+    return this.send(res, await this.videosService.openStream(slug, range));
+  }
+
+  private send(res: Response, delivery: VideoDelivery): StreamableFile {
+    res.status(delivery.statusCode).set(delivery.headers);
+    return new StreamableFile(delivery.body);
   }
 }

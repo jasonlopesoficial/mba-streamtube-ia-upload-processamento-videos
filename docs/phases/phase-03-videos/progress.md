@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 11/15 completed
+**SIs:** 12/15 completed
 
 ### SI-03.1 — Infra: dependências, namespaces de configuração e serviços MinIO/Redis no Compose
 - **Status:** completed
@@ -83,9 +83,11 @@
 - **Observations:** none
 
 ### SI-03.12 — Endpoint GET /videos/{slug}/stream: streaming com Range e 206 Partial Content
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 18 passing (range.util.spec.ts: 15, domain-exception.filter.spec.ts: +1, videos.service.integration-spec.ts: +2) + spec-derived E2E test/videos-stream.e2e-spec.ts 4/4
+- **Observations:**
+  - DomainException gained an optional headers field; DomainExceptionFilter calls response.set(headers) only when present, so existing exceptions are unchanged.
+  - Body is piped from the S3 GetObject stream through StreamableFile; the API never buffers the video in memory.
 
 ### SI-03.13 — Endpoints GET /videos/{slug}/download e /thumbnail
 - **Status:** pending

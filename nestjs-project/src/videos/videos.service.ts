@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { Inject, Injectable } from '@nestjs/common';
+import { HttpStatus, Inject, Injectable } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { ChannelsService } from '../channels/channels.service';
 import {
   ChannelNotFoundException,
   InvalidPartNumberException,
   InvalidVideoStateException,
+  RangeNotSatisfiableException,
   UploadIncompleteException,
   UploadSizeMismatchException,
   VideoNotFoundException,
@@ -25,6 +26,8 @@ import {
   UploadedPartsResponseDto,
 } from './dto/upload-parts-response.dto';
 import { Video } from './entities/video.entity';
+import { parseRangeHeader, UNSATISFIABLE } from './range.util';
+import type { VideoDelivery } from './video-delivery.types';
 import { VideoProcessingProducer } from './video-processing.producer';
 import { VideoStatus } from './videos.constants';
 import { VideosRepository } from './videos.repository';
@@ -211,6 +214,52 @@ export class VideosService {
 
     const updated = await this.videosRepository.findById(video.id);
     return VideoResponseDto.fromEntity(updated!);
+  }
+
+  /** Streams a ready video, honouring a single `Range` request (206). */
+  async openStream(
+    slug: string,
+    rangeHeader: string | undefined,
+  ): Promise<VideoDelivery> {
+    const video = await this.findReadyVideo(slug);
+    const range = parseRangeHeader(rangeHeader, video.size_bytes);
+    if (range === UNSATISFIABLE) {
+      throw new RangeNotSatisfiableException(video.size_bytes);
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': video.content_type,
+      'Accept-Ranges': 'bytes',
+    };
+    if (!range) {
+      const object = await this.storageService.getObjectStream(
+        video.storage_key,
+      );
+      headers['Content-Length'] = String(object.contentLength);
+      return { statusCode: HttpStatus.OK, headers, body: object.body };
+    }
+
+    const object = await this.storageService.getObjectStream(
+      video.storage_key,
+      `bytes=${range.start}-${range.end}`,
+    );
+    headers['Content-Length'] = String(object.contentLength);
+    headers['Content-Range'] =
+      object.contentRange ??
+      `bytes ${range.start}-${range.end}/${video.size_bytes}`;
+    return {
+      statusCode: HttpStatus.PARTIAL_CONTENT,
+      headers,
+      body: object.body,
+    };
+  }
+
+  private async findReadyVideo(slug: string): Promise<Video> {
+    const video = await this.videosRepository.findBySlugWithChannel(slug);
+    if (!video || video.status !== VideoStatus.READY) {
+      throw new VideoNotFoundException();
+    }
+    return video;
   }
 
   private partCount(sizeBytes: number): number {

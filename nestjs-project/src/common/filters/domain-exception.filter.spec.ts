@@ -5,6 +5,7 @@ import {
   EmailNotConfirmedException,
   InvalidCredentialsException,
   InvalidTokenException,
+  RangeNotSatisfiableException,
   TokenExpiredException,
   TokenReuseDetectedException,
 } from '../exceptions/domain.exception';
@@ -96,6 +97,27 @@ describe('DomainExceptionFilter', () => {
       statusCode: 401,
       error: 'TOKEN_REUSE_DETECTED',
       message: expect.any(String),
+    });
+  });
+
+  it('applies exception headers before writing the error body', () => {
+    const mockSet = jest.fn();
+    const host = {
+      ...mockHost,
+      switchToHttp: () => ({
+        getResponse: () => ({ status: mockStatus, set: mockSet }),
+        getRequest: () => ({ url: '/videos/x/stream', method: 'GET' }),
+      }),
+    } as unknown as ArgumentsHost;
+
+    filter.catch(new RangeNotSatisfiableException(1000), host);
+
+    expect(mockSet).toHaveBeenCalledWith({ 'Content-Range': 'bytes */1000' });
+    expect(mockStatus).toHaveBeenCalledWith(416);
+    expect(mockJson).toHaveBeenCalledWith({
+      statusCode: 416,
+      error: 'RANGE_NOT_SATISFIABLE',
+      message: 'Requested range is beyond the end of the video',
     });
   });
 });

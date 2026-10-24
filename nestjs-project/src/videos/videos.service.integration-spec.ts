@@ -10,6 +10,9 @@ import { StorageService } from '../storage/storage.service';
 import { cleanAllTables } from '../test/create-test-data-source';
 import { obliterateQueue, useIsolatedQueuePrefix } from '../test/queue';
 import { User } from '../users/entities/user.entity';
+import { createStoredVideo } from '../test/video-fixtures';
+import { randomBytes } from 'node:crypto';
+import type { Readable } from 'node:stream';
 import { UsersModule } from '../users/users.module';
 import { VIDEO_PROCESSING_QUEUE } from '../video-processing/video-processing.constants';
 import { Video } from './entities/video.entity';
@@ -68,6 +71,18 @@ describe('VideosService (integration)', () => {
       user_id: user.id,
     });
     return user;
+  }
+
+  async function readAll(body: Readable): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of body) chunks.push(chunk as Buffer);
+    return Buffer.concat(chunks);
+  }
+
+  async function ownerChannel(): Promise<Channel> {
+    return dataSource
+      .getRepository(Channel)
+      .findOneByOrFail({ user_id: owner.id });
   }
 
   const dto = {
@@ -152,6 +167,45 @@ describe('VideosService (integration)', () => {
       });
       const job = await queue.getJob(video.id);
       expect(job?.data).toEqual({ videoId: video.id });
+    });
+  });
+
+  describe('openStream', () => {
+    it('returns the exact requested byte range from storage', async () => {
+      const bytes = randomBytes(4096);
+      const video = await createStoredVideo(
+        dataSource,
+        storage,
+        await ownerChannel(),
+        bytes,
+        VideoStatus.READY,
+      );
+
+      const delivery = await service.openStream(video.slug, 'bytes=100-1123');
+
+      expect(delivery.statusCode).toBe(206);
+      expect(delivery.headers).toMatchObject({
+        'Content-Range': `bytes 100-1123/${bytes.length}`,
+        'Content-Length': '1024',
+        'Accept-Ranges': 'bytes',
+      });
+      expect(await readAll(delivery.body)).toEqual(bytes.subarray(100, 1124));
+    });
+
+    it('treats videos that are not ready as not found', async () => {
+      const video = await createStoredVideo(
+        dataSource,
+        storage,
+        await ownerChannel(),
+        randomBytes(64),
+        VideoStatus.PROCESSING,
+      );
+
+      await expect(
+        service.openStream(video.slug, undefined),
+      ).rejects.toMatchObject({
+        errorCode: 'VIDEO_NOT_FOUND',
+      });
     });
   });
 });
