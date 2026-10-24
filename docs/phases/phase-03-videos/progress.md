@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 9/15 completed
+**SIs:** 10/15 completed
 
 ### SI-03.1 — Infra: dependências, namespaces de configuração e serviços MinIO/Redis no Compose
 - **Status:** completed
@@ -69,9 +69,13 @@
   - Container FFmpeg is Debian 5.1.x (bookworm), from Dockerfile.dev.
 
 ### SI-03.10 — Worker de vídeo: consumidor da fila, processamento e serviço `video-worker` no Compose
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 7/7 passing (video-processing.service.integration-spec.ts: 4, video-processing.processor.integration-spec.ts: 2, worker.module.spec.ts: 1); Compose smoke: an upload completed through the in-process API with the default queue prefix was processed by the video-worker container to ready (duration 3 s, thumbnail stored)
+- **Observations:**
+  - start:worker:dev runs 'node --watch -r ts-node/register src/worker.ts' instead of 'nest start --watch --entryFile worker': both containers share the bind mount and nest-cli uses deleteOutDir, so two nest watchers would wipe each other's dist/.
+  - Worker concurrency is applied in onApplicationBootstrap (worker.concurrency = VIDEO_WORKER_CONCURRENCY) because @Processor options are static.
+  - On this machine 'docker compose build' asks for '--allow=fs.read=<context>' (Buildx Bake entitlement check; the project path contains non-ASCII 'Graduação'); BUILDX_BAKE_ENTITLEMENTS_FS=0 bypasses it. Documented in nestjs-project/CLAUDE.md troubleshooting.
+  - Added src/test/video-fixtures.ts (channel owner + stored video row) shared by worker and delivery specs.
 
 ### SI-03.11 — Endpoint GET /videos/{slug}: consulta do vídeo e do status pelo dono
 - **Status:** pending
