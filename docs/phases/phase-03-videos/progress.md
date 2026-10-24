@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 4/15 completed
+**SIs:** 5/15 completed
 
 ### SI-03.1 — Infra: dependências, namespaces de configuração e serviços MinIO/Redis no Compose
 - **Status:** completed
@@ -32,9 +32,11 @@
   - isUniqueViolationOn lives in src/common/database/pg-errors.ts; ChannelsService keeps its own private copy (Phase 02 code untouched) — consolidating it is a follow-up outside this phase's scope.
 
 ### SI-03.5 — Módulos de infraestrutura compartilhados e produtor da fila `video-processing`
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 5/5 passing (video-processing.producer.integration-spec.ts: 3, queue.module.spec.ts: 1, videos.module.spec.ts: 1); auth E2E 52/52 after AppModule refactor
+- **Observations:**
+  - @nestjs/bullmq@12 is ESM-only and fails under the CommonJS Jest runtime ('Unexpected token export'); switched to @nestjs/bullmq@^11.0.5 (CJS, supports bullmq ^6 and Nest 11) and added ioredis@^5 (optional peer of bullmq 6). Recorded as a Revision on phase-03-videos/TD-01 and in library-refs.md.
+  - VideosModule now registers the queue, so DB-focused specs that import it (videos.repository.integration-spec.ts) override the queue token.
 
 ### SI-03.6 — Endpoint POST /videos: pré-cadastro como rascunho e abertura do multipart
 - **Status:** pending

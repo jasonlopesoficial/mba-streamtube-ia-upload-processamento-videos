@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { getQueueToken } from '@nestjs/bullmq';
+import { ConfigModule } from '@nestjs/config';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DataSource, QueryFailedError } from 'typeorm';
@@ -10,6 +12,8 @@ import {
   createTestDataSource,
 } from '../test/create-test-data-source';
 import { User } from '../users/entities/user.entity';
+import videosConfig from '../config/videos.config';
+import { VIDEO_PROCESSING_QUEUE } from '../video-processing/video-processing.constants';
 import { Video } from './entities/video.entity';
 import * as slugUtil from './slug.util';
 import { MAX_SLUG_ATTEMPTS, VideoStatus } from './videos.constants';
@@ -28,10 +32,14 @@ describe('VideosRepository (integration)', () => {
   beforeAll(async () => {
     module = await Test.createTestingModule({
       imports: [
+        ConfigModule.forRoot({ isGlobal: true, load: [videosConfig] }),
         TypeOrmModule.forRoot(createTestDataSource(ALL_ENTITIES).options),
         VideosModule,
       ],
-    }).compile();
+    })
+      .overrideProvider(getQueueToken(VIDEO_PROCESSING_QUEUE))
+      .useValue({})
+      .compile();
     dataSource = module.get(DataSource);
     repository = module.get(VideosRepository);
   });

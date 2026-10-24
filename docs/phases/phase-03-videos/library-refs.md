@@ -1,13 +1,17 @@
 ---
 libs:
   "@nestjs/bullmq":
-    version: "^12.0.0"
+    version: "^11.0.5"
     context7_id: "/nestjs/docs.nestjs.com"
     fetched_at: "2026-10-23T17:05:00-03:00"
   bullmq:
     version: "^6.4.0"
     context7_id: "/websites/bullmq_io"
     fetched_at: "2026-10-23T17:05:00-03:00"
+  ioredis:
+    version: "^5"
+    context7_id: "—"
+    fetched_at: "2026-10-24T07:40:00-03:00"
   "@aws-sdk/client-s3":
     version: "^3.x"
     context7_id: "/aws/aws-sdk-js-v3"
@@ -28,7 +32,7 @@ sources_mtime:
 
 Distilled docs for libraries decided in this phase. Pulled via Context7 (`/nestjs/docs.nestjs.com` → Techniques › Queues; `/websites/bullmq_io`; `/aws/aws-sdk-js-v3`). Everything runs locally: the AWS SDK is only an S3-protocol client pointed at the MinIO container — no AWS account is involved.
 
-Installed-version check (2026-10-23, `npm view`): `@nestjs/bullmq@12.0.0` (peer: `@nestjs/core ^10 || ^11 || ^12`, `bullmq ^3–^6`), `bullmq@6.4.0`, `@aws-sdk/client-s3@3.1156.0`, `@aws-sdk/s3-request-presigner@3.1156.0`. Compatible with the installed NestJS 11.
+Installed-version check (2026-10-23, `npm view`; revised 2026-10-24): `@nestjs/bullmq@11.0.5` (CommonJS; peer: `@nestjs/core ^10 || ^11`, `bullmq ^3–^6`) — `12.x` is ESM-only and does not load under the project's CommonJS Jest runtime; `bullmq@6.4.x` + `ioredis@^5` (BullMQ 6 made `ioredis` an optional peer: without it `Queue` fails with "could not load the optional 'ioredis' package"), `@aws-sdk/client-s3@3.1156.0`, `@aws-sdk/s3-request-presigner@3.1156.0`. Compatible with the installed NestJS 11.
 
 ## @nestjs/bullmq + bullmq — maps to `phase-03-videos/TD-01`, `TD-05`, `TD-09`, `TD-11`
 
