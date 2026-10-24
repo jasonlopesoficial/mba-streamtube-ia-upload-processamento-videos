@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 8/15 completed
+**SIs:** 9/15 completed
 
 ### SI-03.1 — Infra: dependências, namespaces de configuração e serviços MinIO/Redis no Compose
 - **Status:** completed
@@ -62,9 +62,11 @@
   - If enqueueing fails after the draft→processing transition, the video is moved to failed with processing_error and the error propagates (no silent stuck processing).
 
 ### SI-03.9 — MediaProbeService: extração de metadados e captura de frame com FFmpeg
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 9/9 passing (media-probe.parser.spec.ts: 5, media-probe.service.integration-spec.ts: 4)
+- **Observations:**
+  - The integration spec probes the sample both from disk and from a presigned MinIO GET URL; both give identical results, confirming FFmpeg reads over HTTP without a full download step.
+  - Container FFmpeg is Debian 5.1.x (bookworm), from Dockerfile.dev.
 
 ### SI-03.10 — Worker de vídeo: consumidor da fila, processamento e serviço `video-worker` no Compose
 - **Status:** pending
