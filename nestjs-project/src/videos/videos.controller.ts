@@ -1,4 +1,12 @@
-import { Body, Controller, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+} from '@nestjs/common';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -12,6 +20,11 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { CreateVideoResponseDto } from './dto/create-video-response.dto';
+import { SignUploadPartsDto } from './dto/sign-upload-parts.dto';
+import {
+  SignedUploadPartsResponseDto,
+  UploadedPartsResponseDto,
+} from './dto/upload-parts-response.dto';
 import { VideosService } from './videos.service';
 
 @ApiTags('videos')
@@ -52,5 +65,80 @@ export class VideosController {
     @Body() dto: CreateVideoDto,
   ): Promise<CreateVideoResponseDto> {
     return this.videosService.initiateUpload(user.sub, dto);
+  }
+
+  @Post(':slug/upload/parts')
+  @HttpCode(HttpStatus.OK)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Sign upload part URLs',
+    description:
+      'Returns presigned UploadPart URLs for the requested part numbers of a draft video owned by the caller. Also used to resume an interrupted upload with fresh URLs.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Presigned part URLs',
+    type: SignedUploadPartsResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation failed or part number beyond part_count',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid access token',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found or owned by another channel',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Video is not a draft',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async signUploadParts(
+    @CurrentUser() user: JwtPayload,
+    @Param('slug') slug: string,
+    @Body() dto: SignUploadPartsDto,
+  ): Promise<SignedUploadPartsResponseDto> {
+    return this.videosService.signUploadParts(slug, user.sub, dto.part_numbers);
+  }
+
+  @Get(':slug/upload/parts')
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'List uploaded parts',
+    description:
+      'Lists the parts already stored for the open multipart upload of a draft video owned by the caller, so an interrupted upload can resume.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Parts already stored, ordered by part_number',
+    type: UploadedPartsResponseDto,
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid access token',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found or owned by another channel',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Video is not a draft',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async listUploadedParts(
+    @CurrentUser() user: JwtPayload,
+    @Param('slug') slug: string,
+  ): Promise<UploadedPartsResponseDto> {
+    return this.videosService.listUploadedParts(slug, user.sub);
   }
 }

@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 6/15 completed
+**SIs:** 7/15 completed
 
 ### SI-03.1 — Infra: dependências, namespaces de configuração e serviços MinIO/Redis no Compose
 - **Status:** completed
@@ -48,9 +48,11 @@
   - Added test/helpers/app.ts (main.ts globals + register/confirm/login) shared by the phase's E2E suites.
 
 ### SI-03.7 — Endpoints de partes do upload: assinatura de URLs e listagem para retomada
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 14 passing (videos.service.spec.ts: 11 total, +6; videos.service.integration-spec.ts: 2 total, +1) + spec-derived E2E test/videos-upload-parts.e2e-spec.ts 5/5
+- **Observations:**
+  - findOwnedDraft also requires upload_id to be present (a draft without an open multipart upload is treated as INVALID_VIDEO_STATE).
+  - VideosService injects storageConfig to report expires_in_seconds = S3_PRESIGN_EXPIRATION_SECONDS.
 
 ### SI-03.8 — Endpoint POST /videos/{slug}/upload/complete: conclusão do upload e enfileiramento
 - **Status:** pending

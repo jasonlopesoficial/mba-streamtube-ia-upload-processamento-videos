@@ -94,4 +94,34 @@ describe('VideosService (integration)', () => {
       ).resolves.toEqual([]);
     });
   });
+
+  describe('signUploadParts / listUploadedParts', () => {
+    it('stores a part sent to the signed URL and lists it for resume', async () => {
+      const { video } = await service.initiateUpload(owner.id, dto);
+      const bytes = Buffer.alloc(dto.size_bytes, 7);
+
+      const { parts } = await service.signUploadParts(
+        video.slug,
+        owner.id,
+        [1],
+      );
+      const put = await fetch(parts[0].url, {
+        method: 'PUT',
+        body: new Uint8Array(bytes),
+      });
+      expect(put.status).toBe(200);
+
+      await expect(
+        service.listUploadedParts(video.slug, owner.id),
+      ).resolves.toEqual({
+        parts: [
+          {
+            part_number: 1,
+            etag: put.headers.get('etag'),
+            size_bytes: bytes.length,
+          },
+        ],
+      });
+    });
+  });
 });

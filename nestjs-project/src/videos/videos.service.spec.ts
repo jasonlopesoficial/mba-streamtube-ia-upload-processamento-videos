@@ -2,8 +2,12 @@ import { Test } from '@nestjs/testing';
 import { ChannelsService } from '../channels/channels.service';
 import {
   ChannelNotFoundException,
+  InvalidPartNumberException,
+  InvalidVideoStateException,
+  VideoNotFoundException,
   VideoTooLargeException,
 } from '../common/exceptions/domain.exception';
+import storageConfig from '../config/storage.config';
 import videosConfig from '../config/videos.config';
 import { StorageService } from '../storage/storage.service';
 import { Video } from './entities/video.entity';
@@ -61,6 +65,10 @@ describe('VideosService', () => {
     storage = {
       createMultipartUpload: jest.fn().mockResolvedValue('upload-1'),
       abortMultipartUpload: jest.fn().mockResolvedValue(undefined),
+      presignUploadPart: jest.fn((_k: string, _u: string, n: number) =>
+        Promise.resolve(`https://storage/part-${n}`),
+      ),
+      listParts: jest.fn().mockResolvedValue([]),
     } as unknown as jest.Mocked<StorageService>;
     channels = {
       findByUserId: jest
@@ -77,6 +85,10 @@ describe('VideosService', () => {
         {
           provide: videosConfig.KEY,
           useValue: { maxSizeBytes: MAX_SIZE, uploadPartSizeBytes: PART_SIZE },
+        },
+        {
+          provide: storageConfig.KEY,
+          useValue: { presignExpirationSeconds: 3600 },
         },
       ],
     }).compile();
@@ -140,6 +152,81 @@ describe('VideosService', () => {
       });
 
       expect(result.upload.part_count).toBe(2);
+    });
+  });
+
+  describe('signUploadParts / listUploadedParts', () => {
+    const twoParts = buildVideo({ size_bytes: PART_SIZE * 2 });
+
+    it('signs the requested parts of the owner draft in order', async () => {
+      repository.findBySlugWithChannel.mockResolvedValueOnce(twoParts);
+
+      const result = await service.signUploadParts(
+        twoParts.slug,
+        'user-1',
+        [2, 1],
+      );
+
+      expect(result).toEqual({
+        parts: [
+          { part_number: 1, url: 'https://storage/part-1' },
+          { part_number: 2, url: 'https://storage/part-2' },
+        ],
+        expires_in_seconds: 3600,
+      });
+    });
+
+    it('rejects part numbers beyond part_count', async () => {
+      repository.findBySlugWithChannel.mockResolvedValueOnce(twoParts);
+
+      await expect(
+        service.signUploadParts(twoParts.slug, 'user-1', [3]),
+      ).rejects.toBeInstanceOf(InvalidPartNumberException);
+    });
+
+    it('hides videos of other channels as not found', async () => {
+      repository.findBySlugWithChannel.mockResolvedValue(twoParts);
+
+      await expect(
+        service.signUploadParts(twoParts.slug, 'intruder', [1]),
+      ).rejects.toBeInstanceOf(VideoNotFoundException);
+      await expect(
+        service.listUploadedParts(twoParts.slug, 'intruder'),
+      ).rejects.toBeInstanceOf(VideoNotFoundException);
+    });
+
+    it('rejects unknown slugs as not found', async () => {
+      repository.findBySlugWithChannel.mockResolvedValueOnce(null);
+
+      await expect(
+        service.listUploadedParts('missingslug', 'user-1'),
+      ).rejects.toBeInstanceOf(VideoNotFoundException);
+    });
+
+    it('rejects videos that are not drafts', async () => {
+      repository.findBySlugWithChannel.mockResolvedValue(
+        buildVideo({ status: VideoStatus.PROCESSING, upload_id: null }),
+      );
+
+      await expect(
+        service.signUploadParts('AAAAAAAAAAA', 'user-1', [1]),
+      ).rejects.toBeInstanceOf(InvalidVideoStateException);
+      await expect(
+        service.listUploadedParts('AAAAAAAAAAA', 'user-1'),
+      ).rejects.toBeInstanceOf(InvalidVideoStateException);
+    });
+
+    it('maps stored parts to the response shape', async () => {
+      repository.findBySlugWithChannel.mockResolvedValueOnce(twoParts);
+      storage.listParts.mockResolvedValueOnce([
+        { partNumber: 1, etag: '"e1"', sizeBytes: PART_SIZE },
+      ]);
+
+      await expect(
+        service.listUploadedParts(twoParts.slug, 'user-1'),
+      ).resolves.toEqual({
+        parts: [{ part_number: 1, etag: '"e1"', size_bytes: PART_SIZE }],
+      });
     });
   });
 });

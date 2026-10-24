@@ -64,3 +64,29 @@ export class VideoTooLargeException extends DomainException {
     );
   }
 }
+
+export class VideoNotFoundException extends DomainException {
+  constructor() {
+    super('VIDEO_NOT_FOUND', 404, 'Video not found');
+  }
+}
+
+export class InvalidVideoStateException extends DomainException {
+  constructor(status: string) {
+    super(
+      'INVALID_VIDEO_STATE',
+      409,
+      `Operation not allowed while the video is ${status}`,
+    );
+  }
+}
+
+export class InvalidPartNumberException extends DomainException {
+  constructor(partCount: number) {
+    super(
+      'INVALID_PART_NUMBER',
+      400,
+      `Part numbers must be between 1 and ${partCount}`,
+    );
+  }
+}
