@@ -90,3 +90,19 @@ export class InvalidPartNumberException extends DomainException {
     );
   }
 }
+
+export class UploadIncompleteException extends DomainException {
+  constructor(reason: string) {
+    super('UPLOAD_INCOMPLETE', 400, `Upload could not be completed: ${reason}`);
+  }
+}
+
+export class UploadSizeMismatchException extends DomainException {
+  constructor(expected: number, actual: number) {
+    super(
+      'UPLOAD_SIZE_MISMATCH',
+      422,
+      `Uploaded size ${actual} does not match the declared size ${expected}`,
+    );
+  }
+}

@@ -124,4 +124,34 @@ describe('VideosService (integration)', () => {
       });
     });
   });
+
+  describe('completeUpload', () => {
+    it('stores the object, moves to processing and enqueues process-video', async () => {
+      const { video } = await service.initiateUpload(owner.id, dto);
+      const { parts } = await service.signUploadParts(
+        video.slug,
+        owner.id,
+        [1],
+      );
+      const put = await fetch(parts[0].url, {
+        method: 'PUT',
+        body: new Uint8Array(dto.size_bytes),
+      });
+
+      const result = await service.completeUpload(video.slug, owner.id, [
+        { part_number: 1, etag: put.headers.get('etag')! },
+      ]);
+
+      expect(result.status).toBe(VideoStatus.PROCESSING);
+      const row = await dataSource
+        .getRepository(Video)
+        .findOneByOrFail({ id: video.id });
+      expect(row.upload_id).toBeNull();
+      await expect(storage.headObject(row.storage_key)).resolves.toMatchObject({
+        sizeBytes: dto.size_bytes,
+      });
+      const job = await queue.getJob(video.id);
+      expect(job?.data).toEqual({ videoId: video.id });
+    });
+  });
 });

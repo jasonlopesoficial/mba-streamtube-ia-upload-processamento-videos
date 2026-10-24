@@ -6,13 +6,17 @@ import {
   ChannelNotFoundException,
   InvalidPartNumberException,
   InvalidVideoStateException,
+  UploadIncompleteException,
+  UploadSizeMismatchException,
   VideoNotFoundException,
   VideoTooLargeException,
 } from '../common/exceptions/domain.exception';
 import storageConfig from '../config/storage.config';
 import videosConfig from '../config/videos.config';
 import { videoSourceKey } from '../storage/storage.constants';
+import { StorageUploadRejectedError } from '../storage/storage.errors';
 import { StorageService } from '../storage/storage.service';
+import { CompletedPartDto } from './dto/complete-upload.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { CreateVideoResponseDto } from './dto/create-video-response.dto';
 import { VideoResponseDto } from './dto/video-response.dto';
@@ -21,6 +25,7 @@ import {
   UploadedPartsResponseDto,
 } from './dto/upload-parts-response.dto';
 import { Video } from './entities/video.entity';
+import { VideoProcessingProducer } from './video-processing.producer';
 import { VideoStatus } from './videos.constants';
 import { VideosRepository } from './videos.repository';
 
@@ -30,6 +35,7 @@ export class VideosService {
     private readonly videosRepository: VideosRepository,
     private readonly storageService: StorageService,
     private readonly channelsService: ChannelsService,
+    private readonly producer: VideoProcessingProducer,
     @Inject(videosConfig.KEY)
     private readonly config: ConfigType<typeof videosConfig>,
     @Inject(storageConfig.KEY)
@@ -129,6 +135,77 @@ export class VideosService {
         size_bytes: p.sizeBytes,
       })),
     };
+  }
+
+  /**
+   * Completes the multipart upload, verifies the stored size, moves the video
+   * to `processing` and enqueues the `process-video` job.
+   */
+  async completeUpload(
+    slug: string,
+    userId: string,
+    parts: CompletedPartDto[],
+  ): Promise<VideoResponseDto> {
+    const video = await this.findOwnedDraft(slug, userId);
+
+    try {
+      await this.storageService.completeMultipartUpload(
+        video.storage_key,
+        video.upload_id!,
+        parts.map((p) => ({ partNumber: p.part_number, etag: p.etag })),
+      );
+    } catch (err) {
+      if (err instanceof StorageUploadRejectedError) {
+        throw new UploadIncompleteException(err.code);
+      }
+      throw err;
+    }
+
+    const { sizeBytes } = await this.storageService.headObject(
+      video.storage_key,
+    );
+    if (sizeBytes !== video.size_bytes) {
+      await this.storageService.deleteObject(video.storage_key);
+      await this.videosRepository.transitionStatus(
+        video.id,
+        VideoStatus.DRAFT,
+        VideoStatus.FAILED,
+        {
+          upload_id: null,
+          processing_error: `Uploaded size ${sizeBytes} does not match declared size ${video.size_bytes}`,
+          processed_at: new Date(),
+        },
+      );
+      throw new UploadSizeMismatchException(video.size_bytes, sizeBytes);
+    }
+
+    const moved = await this.videosRepository.transitionStatus(
+      video.id,
+      VideoStatus.DRAFT,
+      VideoStatus.PROCESSING,
+      { upload_id: null },
+    );
+    if (!moved) {
+      throw new InvalidVideoStateException(VideoStatus.PROCESSING);
+    }
+
+    try {
+      await this.producer.enqueue(video.id);
+    } catch (err) {
+      await this.videosRepository.transitionStatus(
+        video.id,
+        VideoStatus.PROCESSING,
+        VideoStatus.FAILED,
+        {
+          processing_error: 'Could not enqueue video processing',
+          processed_at: new Date(),
+        },
+      );
+      throw err;
+    }
+
+    const updated = await this.videosRepository.findById(video.id);
+    return VideoResponseDto.fromEntity(updated!);
   }
 
   private partCount(sizeBytes: number): number {

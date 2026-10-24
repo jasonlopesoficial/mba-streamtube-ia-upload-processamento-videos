@@ -18,6 +18,7 @@ import { SkipThrottle } from '@nestjs/throttler';
 import type { JwtPayload } from '../auth/auth.types';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { ApiErrorEnvelope } from '../common/openapi/api-error-envelope.dto';
+import { CompleteUploadDto } from './dto/complete-upload.dto';
 import { CreateVideoDto } from './dto/create-video.dto';
 import { CreateVideoResponseDto } from './dto/create-video-response.dto';
 import { SignUploadPartsDto } from './dto/sign-upload-parts.dto';
@@ -25,6 +26,7 @@ import {
   SignedUploadPartsResponseDto,
   UploadedPartsResponseDto,
 } from './dto/upload-parts-response.dto';
+import { VideoResponseDto } from './dto/video-response.dto';
 import { VideosService } from './videos.service';
 
 @ApiTags('videos')
@@ -140,5 +142,51 @@ export class VideosController {
     @Param('slug') slug: string,
   ): Promise<UploadedPartsResponseDto> {
     return this.videosService.listUploadedParts(slug, user.sub);
+  }
+
+  @Post(':slug/upload/complete')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'Complete a video upload',
+    description:
+      'Completes the multipart upload of a draft video owned by the caller, verifies the stored size, moves the video to processing and enqueues the background processing job (metadata extraction + thumbnail).',
+  })
+  @ApiResponse({
+    status: 202,
+    description: 'Upload completed; processing scheduled',
+    type: VideoResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation failed or storage rejected the parts',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Missing or invalid access token',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'Video not found or owned by another channel',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Video is not a draft',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  @ApiResponse({
+    status: 422,
+    description: 'Stored size differs from the declared size (video failed)',
+    schema: { $ref: getSchemaPath(ApiErrorEnvelope) },
+  })
+  async completeUpload(
+    @CurrentUser() user: JwtPayload,
+    @Param('slug') slug: string,
+    @Body() dto: CompleteUploadDto,
+  ): Promise<VideoResponseDto> {
+    return this.videosService.completeUpload(slug, user.sub, dto.parts);
   }
 }

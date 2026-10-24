@@ -1,7 +1,7 @@
 # phase-03-videos — Progress
 
 **Status:** in_progress
-**SIs:** 7/15 completed
+**SIs:** 8/15 completed
 
 ### SI-03.1 — Infra: dependências, namespaces de configuração e serviços MinIO/Redis no Compose
 - **Status:** completed
@@ -55,9 +55,11 @@
   - VideosService injects storageConfig to report expires_in_seconds = S3_PRESIGN_EXPIRATION_SECONDS.
 
 ### SI-03.8 — Endpoint POST /videos/{slug}/upload/complete: conclusão do upload e enfileiramento
-- **Status:** pending
-- **Tests:** —
-- **Observations:** none
+- **Status:** completed
+- **Tests:** 19 passing in videos.service.spec.ts + videos.service.integration-spec.ts (+5 unit, +1 integration) + spec-derived E2E test/videos-upload-complete.e2e-spec.ts 5/5
+- **Observations:**
+  - test/helpers/video-upload.ts (planned for SI-03.14) was created here because every remaining E2E needs a real direct-to-MinIO upload; SI-03.14 reuses it.
+  - If enqueueing fails after the draft→processing transition, the video is moved to failed with processing_error and the error propagates (no silent stuck processing).
 
 ### SI-03.9 — MediaProbeService: extração de metadados e captura de frame com FFmpeg
 - **Status:** pending
